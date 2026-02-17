@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ISS Distance Tracker</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; background: #000; font-family: sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+        /* TOP BAR (Ab Distance bhi dikhayega) */
+        .top-bar {
+            position: absolute; top: 0; left: 0; width: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            color: #00ffcc;
+            display: flex; justify-content: space-around;
+            padding: 12px 0;
+            z-index: 10;
+            font-size: 13px;
+            border-bottom: 1px solid #00ffcc;
+            font-weight: bold;
+        }
+
+        /* BOTTOM BAR */
+        .bottom-bar {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            box-sizing: border-box;
+            z-index: 10;
+            border-top: 1px solid #00ffcc;
+        }
+
+        select {
+            width: 100%; padding: 12px;
+            background: #111; color: #fff;
+            border: 1px solid #00ffcc; border-radius: 5px;
+            font-size: 16px;
+        }
+
+        /* POPUP CARD */
+        #info-card {
+            display: none; position: absolute; 
+            bottom: 80px; left: 5%; width: 90%;
+            background: rgba(0, 20, 40, 0.95);
+            border: 1px solid #00ffcc; border-radius: 8px;
+            padding: 15px; color: white; z-index: 9;
+            box-sizing: border-box;
+        }
+        .card-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
+        .badge { padding: 2px 6px; border-radius: 4px; color: black; font-weight: bold; font-size: 11px; }
+        .NASA { background: #1E90FF; } .ROS { background: #FF4500; } .ESA { background: #32CD32; }
+
+        /* MARKERS */
+        .iss-marker { font-size: 50px; margin-top: -25px; margin-left: -25px; }
+        
+        /* Aapki Location ka Marker */
+        .user-marker {
+            width: 15px; height: 15px;
+            background-color: #007cbf;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #007cbf;
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div>ALT: <span id="alt" style="color:#fff">--</span></div>
+    <div>SPD: <span id="vel" style="color:#fff">--</span></div>
+    <div style="color:#ff0055">DIST: <span id="dist" style="color:#fff">Wait...</span></div>
+</div>
+
+<div id="map"></div>
+
+<div id="info-card">
+    <div style="text-align:right; color:#00ffcc; font-size:12px; margin-bottom:5px;">● ACTIVE</div>
+    <div class="card-row"><span style="color:#aaa">NAME</span><span id="c-name" style="font-weight:bold">--</span></div>
+    <div class="card-row"><span style="color:#aaa">AGENCY</span><span id="c-agency" class="badge">--</span></div>
+</div>
+
+<div class="bottom-bar">
+    <select id="crewDropdown">
+        <option value="" disabled selected>Tap to Select Crew 👇</option>
+    </select>
+</div>
+
+<script>
+    // ----------------------------------------------------
+    // APNA TOKEN YAHAN DALEIN
+    // ----------------------------------------------------
+    mapboxgl.accessToken = 'pk.eyJ1Ijoic2hpdmFzYWluaTEiLCJhIjoiY21scWVyNHdpMDAxYTNkcjF0Z2ZrODluOSJ9.JVHjoKOv71E1YKxDM7-JeA'; 
+
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/satellite-streets-v12',
+        zoom: 1,
+        center: [0, 0],
+        projection: 'globe'
+    });
+
+    map.on('style.load', () => {
+        map.setFog({ 'color': 'rgb(10, 10, 30)', 'star-intensity': 1.0 });
+    });
+
+    // --- DATA ---
+    let userLat = null;
+    let userLon = null;
+    const crewData = [
+        { id: 1, name: "Sergey Kud-Sverchkov", agency: "ROS" },
+        { id: 2, name: "Chris Williams", agency: "NASA" },
+        { id: 3, name: "Sergei Mikaev", agency: "ROS" },
+        { id: 4, name: "Jessica Meir", agency: "NASA" },
+        { id: 5, name: "Jack Hathaway", agency: "NASA" },
+        { id: 6, name: "Sophie Adenot", agency: "ESA" },
+        { id: 7, name: "Andrey Fedyaev", agency: "ROS" }
+    ];
+
+    map.on('load', () => {
+        // 1. GET USER LOCATION (Permission Mangega)
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(position => {
+                userLat = position.coords.latitude;
+                userLon = position.coords.longitude;
+
+                // User Marker Add
+                const el = document.createElement('div');
+                el.className = 'user-marker';
+                new mapboxgl.Marker(el).setLngLat([userLon, userLat]).addTo(map);
+
+                console.log("User Location Found:", userLat, userLon);
+            }, error => {
+                document.getElementById('dist').innerText = "Deny";
+            });
+        } else {
+            document.getElementById('dist').innerText = "N/A";
+        }
+
+        // Dropdown Logic
+        const dropdown = document.getElementById('crewDropdown');
+        crewData.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id; opt.innerText = m.name; dropdown.appendChild(opt);
+        });
+
+        dropdown.addEventListener('change', (e) => {
+            const member = crewData.find(m => m.id == e.target.value);
+            if(member) {
+                document.getElementById('info-card').style.display = 'block';
+                document.getElementById('c-name').innerText = member.name;
+                const badge = document.getElementById('c-agency');
+                badge.innerText = member.agency; badge.className = `badge ${member.agency}`;
+            }
+        });
+
+        // ISS Marker
+        const el = document.createElement('div');
+        el.className = 'iss-marker';
+        el.innerText = '🛰️';
+        const marker = new mapboxgl.Marker(el).setLngLat([0, 0]).addTo(map);
+
+        // 2. DISTANCE CALCULATION (Haversine Formula)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth Radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return Math.round(R * c);
+        }
+
+        // Tracking Loop
+        async function track() {
+            try {
+                const res = await fetch('https://api.wheretheiss.at/v1/satellites/25544');
+                const data = await res.json();
+                
+                document.getElementById('alt').innerText = data.altitude.toFixed(0);
+                document.getElementById('vel').innerText = Math.round(data.velocity/1000) + "k";
+
+                // Update Distance if User Location Found
+                if(userLat !== null) {
+                    const dist = getDistance(userLat, userLon, data.latitude, data.longitude);
+                    document.getElementById('dist').innerText = dist + " km";
+                }
+
+                marker.setLngLat([data.longitude, data.latitude]);
+                map.easeTo({ center: [data.longitude, data.latitude] });
+
+            } catch (e) {}
+        }
+        track();
+        setInterval(track, 2000);
+    });
+</script>
+
+</body>
+</html>
+
