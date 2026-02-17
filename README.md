@@ -4,6 +4,13 @@
 ![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Mobile-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## 🔴 Live Demo
+### [Click Here to Launch Mission Control 🚀](https://codeveda26.github.io/iss-live-tracking/)
+*(Works on Mobile & Desktop)*
+
+---
+
+## 📖 About The Project
 A cinematic, interactive 3D visualization of the International Space Station (ISS) orbiting Earth. This application tracks the station in real-time, calculates its distance from the user, and displays detailed crew information for **Expedition 74**.
 
 Built with a **Mobile-First** design philosophy, featuring a Sci-Fi "Mission Control" aesthetic.
@@ -42,7 +49,7 @@ Built with a **Mobile-First** design philosophy, featuring a Sci-Fi "Mission Con
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started (Run Locally)
 
 ### Prerequisites
 You need a valid **Mapbox Access Token**. You can get one for free at [mapbox.com](https://mapbox.com/).
